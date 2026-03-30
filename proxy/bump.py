@@ -5,6 +5,7 @@ import threading
 import time
 import queue
 from . import cryptutil
+from . import waitabledict
 
 STATE_HANDSHAKE = 0
 STATE_AUTHORIZING = 1
@@ -37,7 +38,7 @@ class BUMPHandler():
         
         self.settings = settings
         self.outgoing_queue:queue.Queue[BUMPBlock] = queue.Queue()
-        self.incoming_queue:dict[int, BUMPBlock] = {}
+        self.incoming_queue:waitabledict.WaitableDict = waitabledict.WaitableDict()
         self.outgoing_lock = threading.Lock()
 
         self.secure_value = secrets.token_bytes(64)
@@ -58,9 +59,6 @@ class BUMPHandler():
             self.incoming_counter = 0xFFFFFFFF
         else:
             self.outgoing_counter = 0xFFFFFFFF
-
-    def handshake_client(self):
-        pass
 
     def recv_length(self):
         packetlenlen = 0
@@ -91,7 +89,7 @@ class BUMPHandler():
         return data
     
     def check_ratelimit(self):
-        if math.ceil((time.time() - self.timer) / 60) * self.settings.max_traffic_per_minute > self.total_incoming_traffic_bytes:
+        if math.ceil((time.time() - self.timer) / 60) * self.settings.max_traffic_per_minute < self.total_incoming_traffic_bytes:
             raise Exception("Client exceeded maximum traffic limit")
 
     def handle_incoming_forever(self):
@@ -106,9 +104,11 @@ class BUMPHandler():
                 data = self.recv_data(packetlen)
                 self.total_incoming_traffic_bytes += packetlen + 4
                 self.check_ratelimit()
-
+                
                 if self.encryption_key:
                     data = self.decrypt(data)
+
+                self.incoming_counter = (self.incoming_counter + 1) & 0xFFFFFFFF
                 blockid, flags, blocktype = struct.unpack('>QBH', data[:11])
                 blockid = blockid & 0xFFFFFFFF
                 blockdata = data[11:]
@@ -125,17 +125,17 @@ class BUMPHandler():
             if self.closed:
                 break
 
+            block = self.outgoing_queue.get(timeout=5.0)
+            if not block:
+                continue
+            
             with self.outgoing_lock:
-                block = self.outgoing_queue.get(timeout=5.0)
-                if not block:
-                    continue
-                
                 payload = struct.pack('>QBH', block.id, block.flags, block.type) + block.data
                 if block.encrypted:
                     payload = self.encrypt(payload)
                 payload_length = len(payload)
                 payload = struct.pack('>I', payload_length) + payload
-                return payload
+                self.connection.sendall(payload)
         self.closed = True
 
     def cleanup_incoming(self):
@@ -157,3 +157,21 @@ class BUMPHandler():
         # TODO
         assert self.encryption_key, "Encryption is not ready yet!"
         return b''
+    
+    """Make a BUMP request and wait for a response. Returns the response block or None if no response was received within the timeout."""
+    def request(self, blocktype:int, data:bytes, timeout=30) -> BUMPBlock|None:
+        blockid = self.outgoing_counter
+        self.outgoing_counter = (self.outgoing_counter + 1) & 0xFFFFFFFF
+        block = BUMPBlock(blockid, 0, blocktype, data, encrypted=self.state == STATE_READY)
+        self.outgoing_queue.put(block)
+        result = self.incoming_queue.wait(blockid, timeout=timeout)
+        if result:
+            del self.incoming_queue[blockid]
+        return result
+    
+    """Send a BUMP block without waiting for a response."""
+    def send(self, blocktype:int, flags:int, data:bytes):
+        blockid = self.outgoing_counter
+        self.outgoing_counter = (self.outgoing_counter + 1) & 0xFFFFFFFF
+        block = BUMPBlock(blockid, flags, blocktype, data, encrypted=self.state == STATE_READY)
+        self.outgoing_queue.put(block)

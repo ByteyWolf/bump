@@ -1,0 +1,6 @@
+[local_addr]
+filepath = "/tmp/bump.sock"
+
+[remote_addr]
+host = "0.0.0.0"
+port = 5941
