@@ -1,2 +1,6 @@
+# Here you can specify BUMP users and what services they have available.
+# Note that you can specify both plaintext and SHA256 passwords.
+# It is however suggested to use SHA256 hashes for security
+
 [TestUser]
-passhash = "sha256:f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7"
+password = "sha256:f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7"

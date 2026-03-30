@@ -1,8 +1,10 @@
 import threading
-from typing import Any, Iterator
+from typing import Any, Iterator, Generic, TypeVar
 
+K = TypeVar("K")
+V = TypeVar("V")
 
-class WaitableDict:
+class WaitableDict(Generic[K, V]):
     """
     A drop-in dict replacement where you can wait for a key to appear.
 
@@ -14,47 +16,40 @@ class WaitableDict:
         del d["foo"]
         len(d)          # 0
 
-    Blocking wait:
+    Blocking wait for a specific key:
         val = d.wait("foo")             # blocks until "foo" is set
         val = d.wait("foo", timeout=5)  # returns None after 5s if still missing
 
-    Callback on arrival:
-        d.on("foo", lambda v: print("got:", v))
-        d["foo"] = 99   # prints "got: 99" immediately
-
-    Async (asyncio):
-        val = await d.async_wait("foo")
-        val = await d.async_wait("foo", timeout=5)
+    Blocking wait for any key:
+        key, val = d.wait_any()             # blocks until anything is set
+        key, val = d.wait_any(timeout=5)    # returns None after 5s
     """
 
     def __init__(self, *args, **kwargs):
         self._data: dict = dict(*args, **kwargs)
         self._events: dict[Any, threading.Event] = {}
-        self._listeners: dict[Any, list] = {}
         self._lock = threading.Lock()
+        self._any_event = threading.Event()
+        self._last_written: tuple | None = None
 
-        # Fire callbacks/events for anything passed at construction time
         for k, v in self._data.items():
             self._notify(k, v)
 
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _get_event(self, key) -> threading.Event:
-        """Get or create the Event for a key (must be called under lock)."""
         if key not in self._events:
             self._events[key] = threading.Event()
-            if key in self._data:           # already present → pre-set
+            if key in self._data:
                 self._events[key].set()
         return self._events[key]
 
     def _notify(self, key, value):
-        """Set the event and fire callbacks for a key."""
         with self._lock:
             ev = self._get_event(key)
             ev.set()
-            cbs = list(self._listeners.get(key, []))
-        for cb in cbs:
-            cb(value)
+        self._last_written = (key, value)
+        self._any_event.set()
 
     # ── dict interface ────────────────────────────────────────────────────────
 
@@ -70,7 +65,7 @@ class WaitableDict:
             del self._data[key]
             ev = self._events.pop(key, None)
         if ev:
-            ev.clear()              # reset so future wait_get blocks again
+            ev.clear()
 
     def __contains__(self, key):
         return key in self._data
@@ -84,18 +79,12 @@ class WaitableDict:
     def __repr__(self):
         return f"WaitableDict({self._data!r})"
 
-    # standard dict helpers
     def get(self, key, default=None):
         return self._data.get(key, default)
 
-    def keys(self):
-        return self._data.keys()
-
-    def values(self):
-        return self._data.values()
-
-    def items(self):
-        return self._data.items()
+    def keys(self):   return self._data.keys()
+    def values(self): return self._data.values()
+    def items(self):  return self._data.items()
 
     def pop(self, key, *args):
         val = self._data.pop(key, *args)
@@ -106,9 +95,8 @@ class WaitableDict:
         return val
 
     def update(self, *args, **kwargs):
-        tmp = dict(*args, **kwargs)
-        for k, v in tmp.items():
-            self[k] = v             # goes through __setitem__ → notifies
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
 
     def setdefault(self, key, default=None):
         if key not in self._data:
@@ -116,13 +104,11 @@ class WaitableDict:
         return self._data[key]
 
     def clear(self):
-        keys = list(self._data.keys())
-        self._data.clear()
         with self._lock:
-            for k in keys:
-                ev = self._events.pop(k, None)
-                if ev:
-                    ev.clear()
+            self._data.clear()
+            for ev in self._events.values():
+                ev.clear()
+            self._events.clear()
 
     def copy(self):
         return WaitableDict(self._data.copy())
@@ -130,11 +116,14 @@ class WaitableDict:
     # ── waitable extras ───────────────────────────────────────────────────────
 
     def wait(self, key, timeout: float | None = None) -> Any:
-        """
-        Block until `key` exists, then return its value.
-        Returns None on timeout (or the value if already present).
-        """
+        """Block until `key` exists, then return its value. Returns None on timeout."""
         with self._lock:
             ev = self._get_event(key)
         ev.wait(timeout)
         return self._data.get(key)
+
+    def wait_any(self, timeout: float | None = None) -> tuple[K, V] | None:
+        """Block until any key is written, then return (key, value). Returns None on timeout."""
+        self._any_event.wait(timeout)
+        self._any_event.clear()
+        return self._last_written
