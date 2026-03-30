@@ -34,7 +34,7 @@ class ClientHandler():
     def _handle_client(self, conn, addr):
         try:
             self.handler = bump.BUMPHandler(conn, is_proxy=True, conn_type=bump.CONNECTION_WITHCLIENT)
-            blockid, block = self.handler.receive(timeout=10)
+            _, block = self.handler.receive(timeout=10)
             if not block or block.type != 0x0000:
                 raise AuthError(f"Client {addr} failed to send authentication block")
             if block.read(13) != b"BUMPClient1.1":
@@ -51,6 +51,15 @@ class ClientHandler():
                 else:
                     password = password.encode('utf-8')
                 self.handler.encryption_key = hmac.new(password, self.handler.secure_value[16:64], hashlib.sha256).digest()[:16]
+            
+            _, block = self.handler.receive(timeout=10)
+            if not block or block.type != 0x0001:
+                raise AuthError(f"Client {addr} failed to complete authentication handshake")
+            if block.read(8) != b"BUMPTest":
+                raise AuthError(f"Client {addr} failed to complete authentication handshake with correct proof")
+            
+            print("Omg welcome!!!")
+
 
         except AuthError as e:
             print(f"Authentication error: {e}")

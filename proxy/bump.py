@@ -196,9 +196,12 @@ class BUMPHandler():
 
     def request(self, blocktype:int, data:bytes, timeout=30) -> BUMPBlock|None:
         """Make a BUMP request and wait for a response. Returns the response block or None if no response was received within the timeout."""
+        if self.closed:
+            raise ConnectionError("Connection is closed")
+
         blockid = self.outgoing_counter
         self.outgoing_counter = (self.outgoing_counter + 1) & 0xFFFFFFFF
-        block = BUMPBlock(blockid, 0, blocktype, data, encrypted=self.state == STATE_READY)
+        block = BUMPBlock(blockid, 0, blocktype, data, encrypted=self.encryption_key is not None)
         self.outgoing_queue.put(block)
         result = self.incoming_queue.wait(blockid, timeout=timeout)
         if result:
@@ -207,11 +210,17 @@ class BUMPHandler():
     
     def send(self, blocktype:int, flags:int, data:bytes):
         """Send a BUMP block without waiting for a response."""
+        if self.closed:
+            raise ConnectionError("Connection is closed")
+        
         blockid = self.outgoing_counter
         self.outgoing_counter = (self.outgoing_counter + 1) & 0xFFFFFFFF
-        block = BUMPBlock(blockid, flags, blocktype, data, encrypted=self.state == STATE_READY)
+        block = BUMPBlock(blockid, flags, blocktype, data, encrypted=self.encryption_key is not None)
         self.outgoing_queue.put(block)
     
     def receive(self, timeout=30) -> tuple[int|None, BUMPBlock|None]:
         """Get the latest BUMP block of any type as soon as it arrives, or None if no block was received within the timeout."""
+        if self.closed:
+            raise ConnectionError("Connection is closed")
+
         return self.incoming_queue.wait_any(timeout=timeout) or (None, None)
