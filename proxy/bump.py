@@ -14,6 +14,10 @@ STATE_READY = 2
 CONNECTION_WITHCLIENT = 0
 CONNECTION_WITHSERVER = 1
 
+class BUMPException(Exception):
+    def __init__(self, msg):
+        super().__init__(msg)
+
 class BUMPSettings():
     handshake_timeout = 30
     max_packet_size = 10 * 1024 * 1024
@@ -223,4 +227,8 @@ class BUMPHandler():
         if self.closed:
             raise ConnectionError("Connection is closed")
 
-        return self.incoming_queue.wait_any(timeout=timeout) or (None, None)
+        result = self.incoming_queue.wait_any(timeout=timeout)
+        if result and result[1] and result[1].flags & 0x01:
+            raise BUMPException(f"Error packet received: {result[1].data}")
+
+        return result or (None, None)

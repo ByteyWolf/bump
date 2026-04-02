@@ -1,6 +1,7 @@
 import socket
 import threading
 import hmac, hashlib
+import struct
 from .proxy import bump
 
 try:
@@ -20,9 +21,15 @@ class AuthError(Exception):
     def __init__(self, msg):
         super().__init__(msg)
 
+class BUMPService():
+    def __init__(self, name:str, iconhandle:bytes):
+        self.name = name
+        self.iconhandle = iconhandle
+
 class ClientHandler():
     def __init__(self):
-        self.authenticated = {}
+        self.authenticated:dict[str, str] = {} # username -> service name
+        self.available_services:dict[str, BUMPService] = {}
 
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.bind(LOCALDIR)
@@ -40,7 +47,7 @@ class ClientHandler():
             if block.read(13) != b"BUMPClient1.1":
                 raise AuthError(f"Client {addr} sent invalid or malformed authentication block")
             username = block.read_string()
-            if len(username) == 0 or len(username) > 255 or not username in users:
+            if len(username) == 0 or len(username) > 255 or not username in users or username in self.authenticated:
                 raise AuthError(f"Client {addr} sent authentication block with invalid username")
 
             with self.handler.encryption_lock:
@@ -58,7 +65,10 @@ class ClientHandler():
             if block.read(8) != b"BUMPTest":
                 raise AuthError(f"Client {addr} failed to complete authentication handshake with correct proof")
             
-            print("Omg welcome!!!")
+            srvcount = struct.pack(">H", len(self.available_services))
+            for name, service in self.available_services.items():
+                srvcount += name.encode("utf-8") + service.iconhandle
+            self.handler.send(0x0002, 0, srvcount)
 
 
         except AuthError as e:
