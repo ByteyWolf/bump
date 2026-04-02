@@ -2,7 +2,7 @@ import socket
 import threading
 import hmac, hashlib
 import struct
-from .proxy import bump
+from . import bump
 
 try:
     import tomllib as toml

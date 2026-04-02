@@ -1,0 +1,47 @@
+<project name="BUMPMessenger" default="proguard">
+    <property name="wtk" value="/home/sillypaws/Downloads/WTK2.5.2"/>
+    <property name="proguard" value="/home/sillypaws/Downloads/proguard-7.4.2"/>
+    <property name="midpapi" value="${wtk}/lib/midpapi20.jar"/>
+    <property name="bcprov" value="lib/bcprov-jdk14-1.70.jar"/>
+    <target name="compile">
+        <javac srcdir="src"
+               destdir="build/classes"
+               bootclasspath="${wtk}/lib/cldcapi11.jar:${wtk}/lib/midpapi20.jar"
+               classpath="${midpapi}:${bcprov}"
+               includeantruntime="false"
+               source="1.3" target="1.3"/>
+        </target>
+        <target name="preverify" depends="compile">
+            <exec executable="${wtk}/bin/preverify1.1">
+                <arg value="-classpath"/>
+                <arg value="${wtk}/lib/cldcapi11.jar:${wtk}/lib/midpapi20.jar:${bcprov}:build/classes"/>
+                <arg value="-d"/>
+                <arg value="build/preverified"/>
+                <arg value="build/classes"/>
+            </exec>
+        </target>
+        <target name="build" depends="preverify">
+            <jar destfile="build/bumpmsgr.jar" basedir="build/preverified">
+                <zipfileset src="${bcprov}"/>
+                <manifest>
+                    <attribute name="MIDlet-1" value="BUMPMessenger, , BUMPMessenger"/>
+                    <attribute name="MIDlet-Name" value="BUMP Messenger"/>
+                    <attribute name="MIDlet-Version" value="1.0.0"/>
+                    <attribute name="MIDlet-Vendor" value="Bytey Wolf"/>
+                    <attribute name="MicroEdition-Profile" value="MIDP-2.0"/>
+                    <attribute name="MicroEdition-Configuration" value="CLDC-1.1"/>
+                </manifest>
+            </jar>
+        </target>
+        <target name="proguard" depends="build">
+            <java jar="${proguard}/lib/proguard.jar" fork="true">
+                <arg value="-injars build/bumpmsgr.jar"/>
+                <arg value="-outjars build/bumpmsgr-small.jar"/>
+                <arg value="-libraryjars ${wtk}/lib/cldcapi11.jar"/>
+                <arg value="-libraryjars ${wtk}/lib/midpapi20.jar"/>
+                <arg value="-dontobfuscate"/>
+                <arg value="-keep public class BUMPMessenger"/>
+                <arg value="-dontwarn"/>
+            </java>
+        </target>
+    </project>
