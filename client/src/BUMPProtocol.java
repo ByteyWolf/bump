@@ -1,4 +1,7 @@
 import javax.microedition.io.*;
+
+import org.bouncycastle.crypto.InvalidCipherTextException;
+
 import java.io.*;
 
 public class BUMPProtocol {
@@ -14,16 +17,22 @@ public class BUMPProtocol {
 
     public Queue inQueue = new Queue();
     public Queue outQueue = new Queue();
-    public int inCounter = 0;
-    public int outCounter = 0; // note: this must be OR'ed with 0xffffffff on send
+    public long inCounter = 0L;
+    public long outCounter = 0xffffffffL;
 
     private int maxPermissiblePacketSize = 1 * 1024;
     private byte[] secureValue = null;
+    private String userName = null;
+    private byte[] userPasswordSha256 = null;
 
-    public byte connect(String destination) throws IOException {
+    private boolean encryptionEnabled = false;
+
+    public byte connect(String destination, String username, byte[] passwordSha256) throws IOException {
         if (currentState != STATE_DISCONNECTED) {
             return 0;
         }
+        this.userName = username;
+        this.userPasswordSha256 = passwordSha256;
         lastException = null;
         currentState = STATE_CONNECTING;
         conn = (StreamConnection) Connector.open(destination);
@@ -42,7 +51,9 @@ public class BUMPProtocol {
         currentState = STATE_DISCONNECTED;
     }
 
-    public byte[] readNBytes(int n) throws IOException {
+    // private stuff
+
+    private byte[] readNBytes(int n) throws IOException {
         byte[] buffer = new byte[n];
         int total = 0;
 
@@ -76,7 +87,18 @@ public class BUMPProtocol {
                         // of free ram then you dont deserve bump
                         byte[] message = readNBytes(length);
                         BUMPBlock block = new BUMPBlock();
-                        // TODO: decrypt here
+
+                        if (encryptionEnabled) {
+                            byte[] key = Cryptography.HMACHelper.hmacSha256(userPasswordSha256, secureValue, 16, 48);
+                            byte[] iv = new byte[12];
+                            iv[0] = 0; iv[1] = 0; iv[2] = 0; iv[3] = 0;
+
+                            for (int i = 0; i < 8; i++) {
+                                iv[11 - i] = (byte) (inCounter >>> (8 * i));
+                            }
+                            message = Cryptography.AESGCM.decrypt(key, iv, message, null);
+                        }
+
                         block.messageid = DataUtils.readLong(message, 0);
                         block.flags = message[8];
                         block.blocktype = DataUtils.readShort(message, 9);
@@ -84,9 +106,10 @@ public class BUMPProtocol {
                         block.payload_index = 11;
                         inQueue.enqueue(block);
                         inQueue.notifyAll();
+                        inCounter++;
                     }
                 }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 currentState = STATE_DISCONNECTED;
                 lastException = e;
             }
