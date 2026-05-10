@@ -3,22 +3,30 @@ import java.util.Vector;
 public class Queue {
     private Vector vec = new Vector();
 
-    public void enqueue(Object o) {
-        vec.addElement(o);      // add to end
+    public synchronized void enqueue(Object o) {
+        vec.addElement(o);
+        this.notifyAll();
     }
 
-    public Object dequeue() {
-        if (vec.size() == 0) return null;
+    public synchronized Object dequeue() {
+        while (vec.size() == 0) {
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                return null; 
+            }
+        }
+        
         Object o = vec.elementAt(0);
-        vec.removeElementAt(0); // remove from front
+        vec.removeElementAt(0);
         return o;
     }
 
-    public boolean isEmpty() {
+    public synchronized boolean isEmpty() {
         return vec.size() == 0;
     }
 
-    public int size() {
+    public synchronized int size() {
         return vec.size();
     }
 }

@@ -15,7 +15,7 @@ public class BUMPProtocol {
     public volatile byte currentState = STATE_DISCONNECTED;
     public Exception lastException = null;
 
-    public Queue inQueue = new Queue();
+    public Queue inQueue = new Queue(); // maybe a hashmap would be more relevant here
     public Queue outQueue = new Queue();
     public long inCounter = 0L;
     public long outCounter = 0xffffffffL;
@@ -24,6 +24,7 @@ public class BUMPProtocol {
     private byte[] secureValue = null;
     private String userName = null;
     private byte[] userPasswordSha256 = null;
+    private byte[] encryptionKey = null;
 
     private boolean encryptionEnabled = false;
 
@@ -49,6 +50,19 @@ public class BUMPProtocol {
         } catch (IOException e) {
         }
         currentState = STATE_DISCONNECTED;
+    }
+
+    public byte[] request(BUMPBlock block) {
+        long idResp = block.messageid;
+        outQueue.enqueue(block);
+        try {
+            while (currentState != STATE_DISCONNECTED) {
+                inQueue.wait(5);
+
+            }
+        } catch (Exception e) {}
+        
+        return null;
     }
 
     // private stuff
@@ -89,14 +103,17 @@ public class BUMPProtocol {
                         BUMPBlock block = new BUMPBlock();
 
                         if (encryptionEnabled) {
-                            byte[] key = Cryptography.HMACHelper.hmacSha256(userPasswordSha256, secureValue, 16, 48);
+                            if (encryptionKey == null) {
+                                encryptionKey = Cryptography.HMACHelper.hmacSha256(userPasswordSha256, secureValue, 16, 48);
+                            }
+                            
                             byte[] iv = new byte[12];
                             iv[0] = 0; iv[1] = 0; iv[2] = 0; iv[3] = 0;
 
                             for (int i = 0; i < 8; i++) {
                                 iv[11 - i] = (byte) (inCounter >>> (8 * i));
                             }
-                            message = Cryptography.AESGCM.decrypt(key, iv, message, null);
+                            message = Cryptography.AESGCM.decrypt(encryptionKey, iv, message, null);
                         }
 
                         block.messageid = DataUtils.readLong(message, 0);
@@ -118,7 +135,39 @@ public class BUMPProtocol {
 
     private class Writer implements Runnable {
         public void run() {
-            // todo: here we send
+            try {
+                synchronized (outQueue) {
+                    outstream = conn.openOutputStream();
+                    while (currentState != STATE_DISCONNECTED) {
+                        BUMPBlock block = (BUMPBlock)(outQueue.dequeue()); // block.raw already includes all necessary headers
+                        if (block == null || currentState == STATE_DISCONNECTED) { continue; }
+                        if (encryptionEnabled) {
+                            if (encryptionKey == null) {
+                                encryptionKey = Cryptography.HMACHelper.hmacSha256(userPasswordSha256, secureValue, 16, 48);
+                            }
+                            
+                            byte[] iv = new byte[12];
+                            iv[0] = 0; iv[1] = 0; iv[2] = 0; iv[3] = 0;
+
+                            for (int i = 0; i < 8; i++) {
+                                iv[11 - i] = (byte) (outCounter >>> (8 * i));
+                            }
+                            block.raw = Cryptography.AESGCM.encrypt(encryptionKey, iv, block.raw, null);
+                        }
+                        outCounter++;
+                        byte[] payload_len = new byte[4];
+                        DataUtils.writeInt(payload_len, 0, block.raw.length);
+                        outstream.write(payload_len);
+                        outstream.write(block.raw);
+                        block.raw = null;
+                        block = null;
+                        outQueue.notifyAll();
+                    }
+                }
+            } catch (Exception e) {
+                currentState = STATE_DISCONNECTED;
+                lastException = e;
+            }
         }
     }
 

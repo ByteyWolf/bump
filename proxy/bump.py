@@ -142,7 +142,7 @@ class BUMPHandler():
                     if self.encryption_key:
                         data = self._decrypt(data)
 
-                self.incoming_counter = (self.incoming_counter + 1) & 0xFFFFFFFF
+                self.incoming_counter = (self.incoming_counter + 1)
                 blockid, flags, blocktype = struct.unpack('>QBH', data[:11])
                 blockid = blockid & 0xFFFFFFFF
                 blockdata = data[11:]
@@ -204,7 +204,7 @@ class BUMPHandler():
             raise ConnectionError("Connection is closed")
 
         blockid = self.outgoing_counter
-        self.outgoing_counter = (self.outgoing_counter + 1) & 0xFFFFFFFF
+        self.outgoing_counter = (self.outgoing_counter + 1)
         block = BUMPBlock(blockid, 0, blocktype, data, encrypted=self.encryption_key is not None)
         self.outgoing_queue.put(block)
         result = self.incoming_queue.wait(blockid, timeout=timeout)
@@ -218,7 +218,7 @@ class BUMPHandler():
             raise ConnectionError("Connection is closed")
         
         blockid = self.outgoing_counter
-        self.outgoing_counter = (self.outgoing_counter + 1) & 0xFFFFFFFF
+        self.outgoing_counter = (self.outgoing_counter + 1)
         block = BUMPBlock(blockid, flags, blocktype, data, encrypted=self.encryption_key is not None)
         self.outgoing_queue.put(block)
     

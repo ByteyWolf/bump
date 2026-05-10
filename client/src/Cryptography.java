@@ -30,7 +30,7 @@ public class Cryptography {
         }
     }
 
-    public class AESGCM {
+    public static class AESGCM {
 
         public static byte[] encrypt(byte[] key, byte[] iv, byte[] plaintext, byte[] aad) throws InvalidCipherTextException {
             GCMBlockCipher cipher = new GCMBlockCipher(new AESEngine());
@@ -57,7 +57,7 @@ public class Cryptography {
         }
     }
 
-    public class HMACHelper {
+    public static class HMACHelper {
 
         public static byte[] hmacSha256(byte[] key, byte[] data, int offset, int length) {
             HMac hmac = new HMac(new SHA256Digest());
