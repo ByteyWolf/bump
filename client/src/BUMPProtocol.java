@@ -57,7 +57,7 @@ public class BUMPProtocol {
         outQueue.enqueue(block);
         try {
             while (currentState != STATE_DISCONNECTED) {
-                BUMPBlock resp = (BUMPBlock)inQueue.waitKey(idResp, 5);
+                BUMPBlock resp = (BUMPBlock)inQueue.waitKey(new Integer((int)idResp), 5000);
                 return resp;
             }
         } catch (Exception e) {}
@@ -121,7 +121,7 @@ public class BUMPProtocol {
                         block.blocktype = DataUtils.readShort(message, 9);
                         block.raw = message;
                         block.payload_index = 11;
-                        inQueue.put(block.messageid, block);
+                        inQueue.put(new Integer((int) block.messageid), block);
                         inQueue.notifyAll();
                         inCounter++;
                     }

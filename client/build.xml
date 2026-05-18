@@ -1,47 +1,81 @@
-<project name="BUMPMessenger" default="proguard">
+<project name="BUMPMessenger" default="build">
     <property name="wtk" value="/home/sillypaws/Downloads/WTK2.5.2"/>
     <property name="proguard" value="/home/sillypaws/Downloads/proguard-7.4.2"/>
     <property name="midpapi" value="${wtk}/lib/midpapi20.jar"/>
-    <property name="bcprov" value="lib/bcprov-jdk14-1.70.jar"/>
-    <target name="compile">
+    <property name="bcprov" value="lib/lcrypto-core.jar"/>
+
+    <!-- 1. Clean old mess -->
+    <target name="clean">
+        <delete dir="build"/>
+    </target>
+
+    <!-- 2. Compile raw classes -->
+    <target name="compile" depends="clean">
+        <mkdir dir="build/classes"/>
         <javac srcdir="src"
                destdir="build/classes"
                bootclasspath="${wtk}/lib/cldcapi11.jar:${wtk}/lib/midpapi20.jar"
                classpath="${midpapi}:${bcprov}"
                includeantruntime="false"
                source="1.3" target="1.3"/>
-        </target>
-        <target name="preverify" depends="compile">
-            <exec executable="${wtk}/bin/preverify1.1">
-                <arg value="-classpath"/>
-                <arg value="${wtk}/lib/cldcapi11.jar:${wtk}/lib/midpapi20.jar:${bcprov}:build/classes"/>
-                <arg value="-d"/>
-                <arg value="build/preverified"/>
-                <arg value="build/classes"/>
-            </exec>
-        </target>
-        <target name="build" depends="preverify">
-            <jar destfile="build/bumpmsgr.jar" basedir="build/preverified">
-                <zipfileset src="${bcprov}"/>
-                <manifest>
-                    <attribute name="MIDlet-1" value="BUMPMessenger, , BUMPMessenger"/>
-                    <attribute name="MIDlet-Name" value="BUMP Messenger"/>
-                    <attribute name="MIDlet-Version" value="1.0.0"/>
-                    <attribute name="MIDlet-Vendor" value="Bytey Wolf"/>
-                    <attribute name="MicroEdition-Profile" value="MIDP-2.0"/>
-                    <attribute name="MicroEdition-Configuration" value="CLDC-1.1"/>
-                </manifest>
-            </jar>
-        </target>
-        <target name="proguard" depends="build">
-            <java jar="${proguard}/lib/proguard.jar" fork="true">
-                <arg value="-injars build/bumpmsgr.jar"/>
-                <arg value="-outjars build/bumpmsgr-small.jar"/>
-                <arg value="-libraryjars ${wtk}/lib/cldcapi11.jar"/>
-                <arg value="-libraryjars ${wtk}/lib/midpapi20.jar"/>
-                <arg value="-dontobfuscate"/>
-                <arg value="-keep public class BUMPMessenger"/>
-                <arg value="-dontwarn"/>
-            </java>
-        </target>
-    </project>
+    </target>
+
+    <!-- 3. Package EVERYTHING into a fat temporary JAR for ProGuard to slice up -->
+    <target name="jar-raw" depends="compile">
+        <jar destfile="build/bumpmsgr-raw.jar" basedir="build/classes">
+            <zipfileset src="${bcprov}"/>
+        </jar>
+    </target>
+
+    <!-- 4. Let ProGuard strip out all the unused Bouncy Castle stuff -->
+    <target name="proguard" depends="jar-raw">
+        <java jar="${proguard}/lib/proguard.jar" fork="true" failonerror="true">
+            <arg value="-injars"/>
+            <arg value="build/bumpmsgr-raw.jar"/>
+            <arg value="-outjars"/>
+            <arg value="build/bumpmsgr-shrunk.jar"/>
+            
+            <arg value="-libraryjars"/>
+            <arg value="${wtk}/lib/cldcapi11.jar:${wtk}/lib/midpapi20.jar"/>
+            
+            <arg value="-dontoptimize"/>
+            <arg value="-dontobfuscate"/>
+            <arg value="-dontpreverify"/> <!-- Tell ProGuard NOT to use modern preverification -->
+            
+            <arg value="-keep"/>
+            <arg value="public class BUMPMessenger"/>
+            <arg value="-dontwarn"/>
+        </java>
+    </target>
+
+    <!-- 5. CRITICAL STEP: Run WTK preverify on the tiny shrunk JAR to fix the tags -->
+    <target name="preverify" depends="proguard">
+        <mkdir dir="build/preverified"/>
+        <!-- Unzip the shrunk jar so WTK can look at individual classes -->
+        <unzip src="build/bumpmsgr-shrunk.jar" dest="build/to-preverify"/>
+        <delete dir="build/to-preverify/META-INF"/> <!-- Wipe old manifests -->
+
+        <exec executable="${wtk}/bin/preverify1.1" failonerror="true">
+            <arg value="-classpath"/>
+            <arg value="${wtk}/lib/cldcapi11.jar:${wtk}/lib/midpapi20.jar"/>
+            <arg value="-d"/>
+            <arg value="build/preverified"/>
+            <arg value="build/to-preverify"/>
+        </exec>
+    </target>
+
+    <!-- 6. Build the final micro-sized, perfectly tagged JAR for the phone -->
+    <target name="build" depends="preverify">
+        <jar destfile="build/bumpmsgr-small.jar" basedir="build/preverified">
+            <manifest>
+                <attribute name="MIDlet-1" value="BUMPMessenger, , BUMPMessenger"/>
+                <attribute name="MIDlet-Name" value="BUMP Messenger"/>
+                <attribute name="MIDlet-Version" value="1.0.0"/>
+                <attribute name="MIDlet-Vendor" value="Bytey Wolf"/>
+                <attribute name="MicroEdition-Profile" value="MIDP-2.0"/>
+                <attribute name="MicroEdition-Configuration" value="CLDC-1.1"/>
+            </manifest>
+        </jar>
+        <echo message="=== BUILD COMPLETE ==="/>
+    </target>
+</project>
