@@ -3,13 +3,12 @@ import javax.microedition.lcdui.*;
 
 public class BUMPMessenger extends MIDlet {
     private Display display;
-    private Form form;
+    private AppUI ui;
     
     public void startApp() {
         display = Display.getDisplay(this);
-        form = new Form("Test");
-        form.append("Awooooooooooo!");
-        display.setCurrent(form);
+        ui = new AppUI();
+        display.setCurrent(ui);
     }
     
     public void pauseApp() {}

@@ -15,7 +15,7 @@ public class BUMPProtocol {
     public volatile byte currentState = STATE_DISCONNECTED;
     public Exception lastException = null;
 
-    public Queue inQueue = new Queue(); // maybe a hashmap would be more relevant here
+    public WaitableDict inQueue = new WaitableDict();
     public Queue outQueue = new Queue();
     public long inCounter = 0L;
     public long outCounter = 0xffffffffL;
@@ -52,13 +52,13 @@ public class BUMPProtocol {
         currentState = STATE_DISCONNECTED;
     }
 
-    public byte[] request(BUMPBlock block) {
+    public BUMPBlock request(BUMPBlock block) {
         long idResp = block.messageid;
         outQueue.enqueue(block);
         try {
             while (currentState != STATE_DISCONNECTED) {
-                inQueue.wait(5);
-
+                BUMPBlock resp = (BUMPBlock)inQueue.waitKey(idResp, 5);
+                return resp;
             }
         } catch (Exception e) {}
         
@@ -121,7 +121,7 @@ public class BUMPProtocol {
                         block.blocktype = DataUtils.readShort(message, 9);
                         block.raw = message;
                         block.payload_index = 11;
-                        inQueue.enqueue(block);
+                        inQueue.put(block.messageid, block);
                         inQueue.notifyAll();
                         inCounter++;
                     }
