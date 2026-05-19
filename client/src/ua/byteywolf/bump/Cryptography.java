@@ -1,3 +1,4 @@
+package ua.byteywolf.bump;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.engines.AESEngine;
 import org.bouncycastle.crypto.macs.HMac;

@@ -1,33 +1,44 @@
+package ua.byteywolf.bump;
 import javax.microedition.lcdui.Canvas;
 import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
+import javax.microedition.midlet.MIDlet;
+
+import ua.byteywolf.bump.pages.LoginPage;
 
 public class AppUI extends Canvas {
 
-    public static final int PAGE_LOGIN = 0;
-    public static final int TOPBAR_HEIGHT = 40;
+    public static final int TOPBAR_HEIGHT = 30;
 
-    public static final Font boldFont = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_MEDIUM);
+    public static final Font boldFont = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_SMALL);
     public static final Font plainFont = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
 
-    public static int crtPage = PAGE_LOGIN;
+    public static ua.byteywolf.bump.pages.AppPage crtPage = LoginPage.INSTANCE;
     public static int accentBgARGB = 0x00FF00;
     public static int accentTxtARGB = 0x000000;
     public static int uiBgARGB = 0xFFFFFF;
     public static int uiTxtARGB = 0x000000;
 
+    public static BUMPMessenger midlet;
+
     public static final BUMPProtocol messagingApi = new BUMPProtocol();
 
-    public AppUI() {
+    public AppUI(BUMPMessenger creator) {
         setFullScreenMode(true);
         setTitle("BUMP Messenger");
+        UIToolkit.initialize(getWidth(), getHeight(), accentBgARGB);
+        midlet = creator;
     }
 
     protected void paint(Graphics g) {
         int width = getWidth();
         int height = getHeight();
 
+        UIToolkit.blank(TOPBAR_HEIGHT + 5, g);
+
         g.setFont(boldFont);
+        g.setColor(0, 0, 0);
+        g.drawRect(0, 0, width, height);
 
         for (int i = 0; i < 3; i++) {
             setGraphicsColor(g, accentBgARGB, -(i * 25));
@@ -38,6 +49,11 @@ public class AppUI extends Canvas {
         g.drawString(getTitle(), 5, 5, Graphics.LEFT | Graphics.TOP);
 
         g.setFont(plainFont);
+        if (crtPage != null) {
+            crtPage.paint(g, TOPBAR_HEIGHT, 0);
+        } else {
+            BUMPMessenger.showErrorAndExit("There is no page specified.");
+        }
     }
 
     private void setGraphicsColor(Graphics g, int hexColor, int modifier) {
@@ -60,4 +76,5 @@ public class AppUI extends Canvas {
 
         g.setColor(r, gChan, b);
     }
+
 }

@@ -1,3 +1,4 @@
+package ua.byteywolf.bump;
 import java.util.Vector;
 
 public class Queue {

@@ -1,3 +1,4 @@
+package ua.byteywolf.bump;
 public class DataUtils {
     public static int readInt(byte[] b, int offset) {
         return ((b[offset] & 0xFF) << 24) |

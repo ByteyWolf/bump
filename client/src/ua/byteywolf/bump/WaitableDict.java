@@ -1,3 +1,4 @@
+package ua.byteywolf.bump;
 import java.util.Hashtable;
 import java.util.Enumeration;
 

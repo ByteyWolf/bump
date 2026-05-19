@@ -1,3 +1,4 @@
+package ua.byteywolf.bump;
 import javax.microedition.io.*;
 
 import org.bouncycastle.crypto.InvalidCipherTextException;
