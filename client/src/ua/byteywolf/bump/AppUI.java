@@ -26,7 +26,7 @@ public class AppUI extends Canvas {
     public AppUI(BUMPMessenger creator) {
         setFullScreenMode(true);
         setTitle("BUMP Messenger");
-        UIToolkit.initialize(getWidth(), getHeight(), accentBgARGB);
+        UIToolkit.initialize(getWidth(), getHeight(), accentBgARGB, crtPage, creator);
         midlet = creator;
     }
 
@@ -38,15 +38,17 @@ public class AppUI extends Canvas {
 
         g.setFont(boldFont);
         g.setColor(0, 0, 0);
-        g.drawRect(0, 0, width, height);
+        g.fillRect(0, 0, width, height);
 
-        for (int i = 0; i < 3; i++) {
+        int quartHeight = TOPBAR_HEIGHT / 4;
+        for (int i = 0; i <= 3; i++) {
             setGraphicsColor(g, accentBgARGB, -(i * 25));
-            g.fillRect(0, (TOPBAR_HEIGHT * i) / 4, width, TOPBAR_HEIGHT / 4);
+            g.fillRect(0, quartHeight * i, width, quartHeight);
         }
 
+        int fontHeight = g.getFont().getHeight();
         setGraphicsColor(g, accentTxtARGB, 0);
-        g.drawString(getTitle(), 5, 5, Graphics.LEFT | Graphics.TOP);
+        g.drawString(getTitle(), 5, (TOPBAR_HEIGHT - fontHeight) / 2, Graphics.LEFT | Graphics.TOP);
 
         g.setFont(plainFont);
         if (crtPage != null) {
@@ -54,6 +56,13 @@ public class AppUI extends Canvas {
         } else {
             BUMPMessenger.showErrorAndExit("There is no page specified.");
         }
+
+        UIToolkit.finish();
+    }
+
+    protected void keyPressed(int keyCode) {
+        UIToolkit.keyPressed(getGameAction(keyCode));
+        repaint();
     }
 
     private void setGraphicsColor(Graphics g, int hexColor, int modifier) {

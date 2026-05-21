@@ -43,7 +43,7 @@
             <arg value="-dontpreverify"/> <!-- Tell ProGuard NOT to use modern preverification -->
             
             <arg value="-keep"/>
-            <arg value="public class BUMPMessenger"/>
+            <arg value="public class ua.byteywolf.bump.BUMPMessenger"/>
             <arg value="-dontwarn"/>
         </java>
     </target>
@@ -68,7 +68,7 @@
     <target name="build" depends="preverify">
         <jar destfile="build/bumpmsgr-small.jar" basedir="build/preverified">
             <manifest>
-                <attribute name="MIDlet-1" value="BUMPMessenger, , BUMPMessenger"/>
+                <attribute name="MIDlet-1" value="BUMPMessenger, , ua.byteywolf.bump.BUMPMessenger"/>
                 <attribute name="MIDlet-Name" value="BUMP Messenger"/>
                 <attribute name="MIDlet-Version" value="1.0.0"/>
                 <attribute name="MIDlet-Vendor" value="Bytey Wolf"/>
