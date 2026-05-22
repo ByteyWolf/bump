@@ -32,6 +32,10 @@ public class UIToolkit {
     public static int selectedElement = 0;
     public static int elementCount = 0;
     private static int tempCount = 0;
+    
+    public static int scrollDistance = 0;
+    public static int pageHeight = 0;
+    private static int tempHeight = 0;
 
     private static BUMPMessenger midlet = null;
 
@@ -58,10 +62,11 @@ public class UIToolkit {
 
     // Call this at the start of a painting session.
     // AppUI.java already does this before invoking other page drawing.
-    public static void blank(int newOffset, Graphics newGraphics) {
-        offset = newOffset;
+    public static void blank(int startOffset, Graphics newGraphics) {
+        offset = startOffset - scrollDistance;
         g = newGraphics;
         tempCount = 0;
+        tempHeight = -offset;
     }
 
     // Call this at the finish of a painting session.
@@ -69,6 +74,7 @@ public class UIToolkit {
     public static void finish() {
         if (selectedElement >= tempCount) selectedElement = 0;
         elementCount = tempCount;
+        pageHeight = tempHeight += offset;
     }
 
     // Called by AppUI.java
@@ -91,6 +97,55 @@ public class UIToolkit {
 
     // ==================== [ UI ELEMENTS ] ====================
 
+    public static void Separator(String text) {
+        Font ogFont = g.getFont();
+        int fontHeight = ogFont.getHeight();
+        int objectHeight = fontHeight * 3 / 2;
+
+        if (fitsOnScreen(objectHeight)) {
+        g.setColor(128, 128, 128);
+        g.drawLine(X_PADDING, offset + objectHeight / 2, screenWidth - X_PADDING, offset + objectHeight / 2);
+        int textWidth = ogFont.stringWidth(text);
+        g.setColor(0, 0, 0);
+        g.fillRect(X_PADDING * 3, offset, textWidth + X_PADDING * 2, objectHeight);
+        g.setColor(255, 255, 255);
+        g.drawString(text, X_PADDING * 4, offset + (objectHeight - fontHeight) / 2, Graphics.TOP | Graphics.LEFT);
+        }
+
+        offset += objectHeight;
+    }
+
+    public static void Checkbox(String label, boolean checked) {
+        Font ogFont = g.getFont();
+        int fontHeight = ogFont.getHeight();
+        int boxHeight = fontHeight;
+        int necessaryPadding = (boxHeight - fontHeight) / 2;
+
+        if (fitsOnScreen(boxHeight)) {
+
+        boolean selected = (selectedElement == tempCount);
+        tempCount++;
+
+        int spacingRight = ogFont.stringWidth(label) + ogFont.charWidth(' ');
+        if (label.length() == 0) {spacingRight = 0;}
+        else {g.setColor(255, 255, 255); g.drawString(label, X_PADDING, offset + necessaryPadding, Graphics.TOP | Graphics.LEFT);}
+
+        g.setColor(40, 40, 40);
+        if (selected) g.setColor(accentR, accentG, accentB);
+        g.fillRect(X_PADDING + spacingRight, offset + necessaryPadding, fontHeight, fontHeight);
+        g.setColor(20, 20, 20);
+        if (selected) g.setColor(50, 50, 50);
+        g.fillRect(X_PADDING + spacingRight + 1, offset + necessaryPadding + 1, fontHeight - 2, fontHeight - 2);
+
+        if (checked) {
+            g.setColor(accentR, accentG, accentB);
+            g.fillRect(X_PADDING + spacingRight + 4, offset + necessaryPadding + 4, fontHeight - 8, fontHeight - 8);
+        }
+        }
+
+        offset += boxHeight * 6 / 5;
+    }
+
     public static void TextLabel(String text) {
         g.setColor(255, 255, 255);
         offset += drawWrappedText(g, text, X_PADDING, offset, screenWidth - (X_PADDING * 2));
@@ -104,6 +159,8 @@ public class UIToolkit {
 
         boolean selected = (selectedElement == tempCount);
         tempCount++;
+
+        if (fitsOnScreen(boxHeight)) {
 
         int spacingRight = ogFont.stringWidth(label) + ogFont.charWidth(' ');
         if (label.length() == 0) {spacingRight = 0;}
@@ -125,6 +182,7 @@ public class UIToolkit {
         }
         g.drawString(textEntered, X_PADDING * 2 + spacingRight, offset + necessaryPadding, Graphics.TOP | Graphics.LEFT);
         //g.setFont(ogFont);
+        }
 
         offset += boxHeight * 6 / 5;
     }
@@ -135,12 +193,14 @@ public class UIToolkit {
         int width = X_PADDING * 2 + g.getFont().stringWidth(text) + (X_PADDING * 2);
         int necessaryPadding = (boxHeight - fontHeight) / 2;
 
+        if (fitsOnScreen(boxHeight)) {
+
         boolean selected = (selectedElement == tempCount);
         tempCount++;
 
         for (int i = 0; i < BTN_DEPTH; i++) {
-            safeSetColor(255 - (i*20), 255 - (i*20), 255 - (i*20));
-            if (selected) safeSetColor(accentR - (i*20), accentG - (i*20), accentB - (i*20));
+            safeSetColor(255 / BTN_DEPTH * i, 255 / BTN_DEPTH * i, 255 / BTN_DEPTH * i);
+            if (selected) safeSetColor(accentR / BTN_DEPTH * i, accentG / BTN_DEPTH * i, accentB / BTN_DEPTH * i);
             g.fillRect(X_PADDING + i, offset + i, width - (i * 2), boxHeight - (i*2));
         }
 
@@ -149,7 +209,9 @@ public class UIToolkit {
         g.fillRect(X_PADDING + BTN_DEPTH, offset + BTN_DEPTH, width - (BTN_DEPTH * 2), boxHeight - (BTN_DEPTH*2));
 
         g.setColor(255, 255, 255);
-        g.drawString(text, X_PADDING * 2, offset + necessaryPadding, Graphics.TOP | Graphics.LEFT);
+        g.drawString(text, X_PADDING + BTN_DEPTH + (width - (BTN_DEPTH * 2)) / 2, offset + necessaryPadding, Graphics.TOP | Graphics.HCENTER);
+
+        }
 
         offset += boxHeight * 6 / 5;
     }
@@ -159,6 +221,12 @@ public class UIToolkit {
     }
 
     // ==================== [ USEFUL ] ====================
+    private static boolean fitsOnScreen(int height) {
+        if (offset > screenHeight || offset < -height) return false;
+        return true;
+    }
+
+
     public static void promptText(String title, String currentText, int maxSize) {
         promptText(title, currentText, maxSize, -1);
     }

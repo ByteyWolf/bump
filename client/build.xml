@@ -69,7 +69,7 @@
         <jar destfile="build/bumpmsgr-small.jar" basedir="build/preverified">
             <manifest>
                 <attribute name="MIDlet-1" value="BUMPMessenger, , ua.byteywolf.bump.BUMPMessenger"/>
-                <attribute name="MIDlet-Name" value="BUMP Messenger"/>
+                <attribute name="MIDlet-Name" value="Lupin Messenger"/>
                 <attribute name="MIDlet-Version" value="1.0.0"/>
                 <attribute name="MIDlet-Vendor" value="Bytey Wolf"/>
                 <attribute name="MicroEdition-Profile" value="MIDP-2.0"/>

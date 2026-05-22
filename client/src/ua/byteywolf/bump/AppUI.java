@@ -25,7 +25,7 @@ public class AppUI extends Canvas {
 
     public AppUI(BUMPMessenger creator) {
         setFullScreenMode(true);
-        setTitle("BUMP Messenger");
+        setTitle("Lupin Messenger");
         UIToolkit.initialize(getWidth(), getHeight(), accentBgARGB, crtPage, creator);
         midlet = creator;
     }
