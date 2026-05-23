@@ -1,2 +1,6 @@
 .vscode/
 client/build/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

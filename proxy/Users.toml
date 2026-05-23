@@ -3,4 +3,4 @@
 # It is however suggested to use SHA256 hashes for security
 
 [TestUser]
-password = "sha256:f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7"
+password = "sha256:f76b61b962db075bb76ad6f3fab10f7bd546f92f1b89f18c513d4122575c18ac"

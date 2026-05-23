@@ -1,7 +1,7 @@
 package ua.byteywolf.bump;
 import javax.microedition.io.*;
 
-import org.bouncycastle.crypto.InvalidCipherTextException;
+import org.bouncycastle.crypto.digests.SHA256Digest;
 
 import java.io.*;
 
@@ -29,18 +29,30 @@ public class BUMPProtocol {
 
     private boolean encryptionEnabled = false;
 
-    public byte connect(String destination, String username, byte[] passwordSha256) throws IOException {
-        if (currentState != STATE_DISCONNECTED) {
-            return 0;
+    public boolean connect(String destination, String username, String password) {
+        try {
+            if (currentState != STATE_DISCONNECTED) {
+                return false;
+            }
+            SHA256Digest digest = new SHA256Digest();
+            byte[] encoded = password.getBytes("UTF-8");
+            digest.update(encoded, 0, encoded.length);
+            byte[] passwordSha256 = new byte[digest.getDigestSize()];
+            digest.doFinal(passwordSha256, 0);
+
+            this.userName = username;
+            this.userPasswordSha256 = passwordSha256;
+            lastException = null;
+            currentState = STATE_CONNECTING;
+            conn = (StreamConnection) Connector.open("socket://" + destination);
+            new Thread(new Reader()).start();
+            new Thread(new Writer()).start();
+            return true;
+        } catch (Exception e) {
+            lastException = e;
+            currentState = STATE_DISCONNECTED;
+            return false;
         }
-        this.userName = username;
-        this.userPasswordSha256 = passwordSha256;
-        lastException = null;
-        currentState = STATE_CONNECTING;
-        conn = (StreamConnection) Connector.open(destination);
-        new Thread(new Reader()).start();
-        new Thread(new Writer()).start();
-        return 1;
     }
 
     public void die() {

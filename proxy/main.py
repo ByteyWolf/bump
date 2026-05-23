@@ -2,7 +2,7 @@ import socket
 import threading
 import hmac, hashlib
 import struct
-from . import bump
+import bump
 
 try:
     import tomllib as toml
@@ -40,8 +40,8 @@ class ClientHandler():
 
     def _handle_client(self, conn, addr):
         try:
-            self.handler = bump.BUMPHandler(conn, is_proxy=True, conn_type=bump.CONNECTION_WITHCLIENT)
-            _, block = self.handler.receive(timeout=10)
+            handler = bump.BUMPHandler(conn, is_proxy=True, conn_type=bump.CONNECTION_WITHCLIENT)
+            _, block = handler.receive(timeout=10)
             if not block or block.type != 0x0000:
                 raise AuthError(f"Client {addr} failed to send authentication block")
             if block.read(13) != b"BUMPClient1.1":
@@ -50,16 +50,16 @@ class ClientHandler():
             if len(username) == 0 or len(username) > 255 or not username in users or username in self.authenticated:
                 raise AuthError(f"Client {addr} sent authentication block with invalid username")
 
-            with self.handler.encryption_lock:
-                self.handler.send(0x0001, 0, self.handler.secure_value)
+            with handler.encryption_lock:
+                handler.send(0x0001, 0, handler.secure_value)
                 password = users[username]["password"]
                 if password.startswith("sha256:"):
                     password = bytes.fromhex(password.removeprefix("sha256:"))
                 else:
                     password = password.encode('utf-8')
-                self.handler.encryption_key = hmac.new(password, self.handler.secure_value[16:64], hashlib.sha256).digest()[:16]
+                handler.encryption_key = hmac.new(password, handler.secure_value[16:64], hashlib.sha256).digest()[:16]
             
-            _, block = self.handler.receive(timeout=10)
+            _, block = handler.receive(timeout=10)
             if not block or block.type != 0x0001:
                 raise AuthError(f"Client {addr} failed to complete authentication handshake")
             if block.read(8) != b"BUMPTest":
@@ -68,7 +68,7 @@ class ClientHandler():
             srvcount = struct.pack(">H", len(self.available_services))
             for name, service in self.available_services.items():
                 srvcount += name.encode("utf-8") + service.iconhandle
-            self.handler.send(0x0002, 0, srvcount)
+            handler.send(0x0002, 0, srvcount)
 
 
         except AuthError as e:

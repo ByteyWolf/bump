@@ -5,7 +5,7 @@ import threading
 import time
 import queue
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from . import waitabledict
+import waitabledict
 
 STATE_HANDSHAKE = 0
 STATE_AUTHORIZING = 1

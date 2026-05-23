@@ -92,7 +92,16 @@ public class LoginPage implements AppPage {
                 break;
             case LOGIN_BTN:
                 save();
-                throw new RuntimeException("*bites you*");
+                final java.util.Timer delayTimer = new java.util.Timer();
+
+                delayTimer.schedule(new java.util.TimerTask() {
+                    public void run() {
+                        AppUI.messagingApi.connect(serverName, username, passwordPlaintext);
+                        delayTimer.cancel();
+                    }
+                }, 100);
+                
+                AppUI.switchPages(ConnectingPage.INSTANCE);
             case REMEMBER_CHK:
                 rememberUser = !rememberUser;
                 save();
@@ -123,6 +132,8 @@ public class LoginPage implements AppPage {
         }
         save();
     }
+
+    public void cleanup() {}
 
     public static void save() {
         RecordStore rs = null;

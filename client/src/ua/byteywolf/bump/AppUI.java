@@ -64,7 +64,13 @@ public class AppUI extends Canvas implements Runnable {
 
         int fontHeight = g.getFont().getHeight();
         setGraphicsColor(g, accentTxtARGB, 0);
-        g.drawString(getTitle(), 5, (TOPBAR_HEIGHT - fontHeight) / 2, Graphics.LEFT | Graphics.TOP);
+        g.drawString(getTitle(), 23, (TOPBAR_HEIGHT - fontHeight) / 2, Graphics.LEFT | Graphics.TOP);
+    }
+
+    public static void switchPages(ua.byteywolf.bump.pages.AppPage newPage) {
+        crtPage.cleanup();
+        crtPage = newPage;
+        UIToolkit.initialize(instance.getWidth(), instance.getHeight(), accentBgARGB, crtPage, midlet);
     }
 
     public void run() {
