@@ -17,8 +17,8 @@ public class LoginPage implements AppPage {
     public static final int USERNAME_FIELD = 0;
     public static final int PASSWORD_FIELD = 1;
     public static final int LOGIN_BTN = 2;
-    public static final int REMEMBER_CHK = 3;
-    public static final int SERVER_FIELD = 4;
+    public static final int REMEMBER_CHK = 4;
+    public static final int SERVER_FIELD = 3;
 
     public static final String STORE_NAME = "BUMPMsgAuth";
 
@@ -26,7 +26,7 @@ public class LoginPage implements AppPage {
     public static String passwordPlaintext = ""; // why the hell do we need to encrypt this if its in ram only
     public static String passwordMasked = "";
     public static String serverName = "";
-    public static boolean rememberUser = false;
+    public static boolean rememberUser = true;
     public static boolean initialized = false;
 
     public void initialize() {
@@ -75,10 +75,11 @@ public class LoginPage implements AppPage {
         UIToolkit.EntryBox("Username:", username, "bitesyou@wolf.com");
         UIToolkit.EntryBox("Password:", passwordMasked, "hunter2");
         UIToolkit.TextButton("Log In");
-        UIToolkit.Checkbox("Remember me", rememberUser);
         UIToolkit.Separator("Additional options");
         UIToolkit.EntryBox("Server:", serverName, "bump.byteywolf.com");
         UIToolkit.TextLabel("Include the port in the address. Do not specify the default address, it will not work! You must specify the address of your self-hosted instance.");
+        UIToolkit.Gap(10);
+        UIToolkit.Checkbox("Remember me", rememberUser);
     }
 
     public void elementSelect(int elementId) {

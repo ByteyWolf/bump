@@ -2,11 +2,10 @@ package ua.byteywolf.bump;
 import javax.microedition.lcdui.Canvas;
 import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
-import javax.microedition.midlet.MIDlet;
 
 import ua.byteywolf.bump.pages.LoginPage;
 
-public class AppUI extends Canvas {
+public class AppUI extends Canvas implements Runnable {
 
     public static final int TOPBAR_HEIGHT = 30;
 
@@ -23,22 +22,39 @@ public class AppUI extends Canvas {
 
     public static final BUMPProtocol messagingApi = new BUMPProtocol();
 
+    private volatile static int heldGameAction = 0;
+    private volatile static long heldStartTime = 0;
+
+    public static AppUI instance;
+
     public AppUI(BUMPMessenger creator) {
+        instance = this;
         setFullScreenMode(true);
         setTitle("Lupin Messenger");
         UIToolkit.initialize(getWidth(), getHeight(), accentBgARGB, crtPage, creator);
         midlet = creator;
+        new Thread(this).start();
     }
 
     protected void paint(Graphics g) {
         int width = getWidth();
         int height = getHeight();
 
-        UIToolkit.blank(TOPBAR_HEIGHT + 5, g);
-
-        g.setFont(boldFont);
         g.setColor(0, 0, 0);
         g.fillRect(0, 0, width, height);
+
+        UIToolkit.blank(TOPBAR_HEIGHT + 5, g, 0);
+
+        g.setFont(plainFont);
+        if (crtPage != null) {
+            crtPage.paint(g, TOPBAR_HEIGHT, 0);
+        } else {
+            BUMPMessenger.showErrorAndExit("There is no page specified.");
+        }
+
+        UIToolkit.finish();
+
+        g.setFont(boldFont);
 
         int quartHeight = TOPBAR_HEIGHT / 4;
         for (int i = 0; i <= 3; i++) {
@@ -49,21 +65,37 @@ public class AppUI extends Canvas {
         int fontHeight = g.getFont().getHeight();
         setGraphicsColor(g, accentTxtARGB, 0);
         g.drawString(getTitle(), 5, (TOPBAR_HEIGHT - fontHeight) / 2, Graphics.LEFT | Graphics.TOP);
+    }
 
-        g.setFont(plainFont);
-        if (crtPage != null) {
-            crtPage.paint(g, TOPBAR_HEIGHT, 0);
-        } else {
-            BUMPMessenger.showErrorAndExit("There is no page specified.");
+    public void run() {
+        while (true) {
+            try {Thread.sleep(100);} catch (InterruptedException e) {}
+            while (heldGameAction >= 0 && heldStartTime != 0 && System.currentTimeMillis() - heldStartTime > 400) {
+                keyPressedBehavior(getKeyCode(heldGameAction));
+                try {Thread.sleep(80);} catch (InterruptedException e) {}
+                if (heldGameAction == -1) break;
+            }
         }
-
-        UIToolkit.finish();
     }
 
     protected void keyPressed(int keyCode) {
-        UIToolkit.keyPressed(getGameAction(keyCode));
+        keyPressedBehavior(keyCode);
+        int gameAction = getGameAction(keyCode);
+        if (gameAction == LEFT || gameAction == RIGHT || gameAction == UP || gameAction == DOWN) {
+            heldGameAction = gameAction;
+            heldStartTime = System.currentTimeMillis();
+        }
+    }
+
+    private void keyPressedBehavior(int keyCode) {
+        int gameAction = getGameAction(keyCode);
+        UIToolkit.keyPressed(gameAction);
         repaint();
     }
+
+    protected void keyReleased(int keyCode) {
+        if (heldGameAction == getGameAction(keyCode)) heldGameAction = -1;
+    }    
 
     private void setGraphicsColor(Graphics g, int hexColor, int modifier) {
         int r = ((hexColor >> 16) & 0xFF) + modifier;

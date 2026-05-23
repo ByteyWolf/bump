@@ -8,7 +8,6 @@ import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.TextBox;
 import javax.microedition.lcdui.TextField;
-import javax.microedition.midlet.MIDlet;
 
 import ua.byteywolf.bump.pages.AppPage;
 
@@ -24,6 +23,8 @@ public class UIToolkit {
     public static int screenWidth = 0;
     public static int screenHeight = 0;
     private static AppPage crtPage;
+    public static int bottomBarHeight = 0;
+    public static int topBarHeight = 0;
 
     private static int accentR = 0;
     private static int accentG = 0;
@@ -38,6 +39,7 @@ public class UIToolkit {
     private static int tempHeight = 0;
 
     private static BUMPMessenger midlet = null;
+    private static AppUI canvas = null;
 
     // text prompting nonsense
     private static final Command SAVE_CMD = new Command("Save", Command.OK, 1);
@@ -48,6 +50,7 @@ public class UIToolkit {
     public static void initialize(int newWidth, int newHeight, int newAccentColorRgba, AppPage page, BUMPMessenger creator) {
         screenWidth = newWidth;
         screenHeight = newHeight;
+        scrollDistance = 0;
 
         accentR = ((newAccentColorRgba >> 16) & 0xFF);
         accentG = ((newAccentColorRgba >> 8) & 0xFF);
@@ -58,15 +61,18 @@ public class UIToolkit {
 
         midlet = creator;
         display = Display.getDisplay(midlet);
+        canvas = AppUI.instance;
     }
 
     // Call this at the start of a painting session.
     // AppUI.java already does this before invoking other page drawing.
-    public static void blank(int startOffset, Graphics newGraphics) {
+    public static void blank(int startOffset, Graphics newGraphics, int bottomOffset) {
         offset = startOffset - scrollDistance;
         g = newGraphics;
         tempCount = 0;
         tempHeight = -offset;
+        bottomBarHeight = bottomOffset;
+        topBarHeight = startOffset;
     }
 
     // Call this at the finish of a painting session.
@@ -121,10 +127,10 @@ public class UIToolkit {
         int boxHeight = fontHeight;
         int necessaryPadding = (boxHeight - fontHeight) / 2;
 
-        if (fitsOnScreen(boxHeight)) {
-
         boolean selected = (selectedElement == tempCount);
         tempCount++;
+
+        if (fitsOnScreen(boxHeight)) {
 
         int spacingRight = ogFont.stringWidth(label) + ogFont.charWidth(' ');
         if (label.length() == 0) {spacingRight = 0;}
@@ -193,10 +199,11 @@ public class UIToolkit {
         int width = X_PADDING * 2 + g.getFont().stringWidth(text) + (X_PADDING * 2);
         int necessaryPadding = (boxHeight - fontHeight) / 2;
 
-        if (fitsOnScreen(boxHeight)) {
-
         boolean selected = (selectedElement == tempCount);
         tempCount++;
+
+        if (fitsOnScreen(boxHeight)) {
+        
 
         for (int i = 0; i < BTN_DEPTH; i++) {
             safeSetColor(255 / BTN_DEPTH * i, 255 / BTN_DEPTH * i, 255 / BTN_DEPTH * i);
@@ -222,8 +229,24 @@ public class UIToolkit {
 
     // ==================== [ USEFUL ] ====================
     private static boolean fitsOnScreen(int height) {
-        if (offset > screenHeight || offset < -height) return false;
-        return true;
+        boolean fits = true;
+        tempCount--;
+        if (offset > screenHeight - bottomBarHeight || offset < -height + topBarHeight) fits = false;
+        if (selectedElement == tempCount) {
+            g.setColor(fits ? 0 : 255, fits ? 255 : 0, 0);
+            g.fillRect(300, 220, 20, 20);
+        }
+        if (selectedElement == tempCount && !fits) {
+            // scroll into view preferably
+            if (offset > screenHeight - bottomBarHeight) {
+                scrollDistance += (offset + height) - screenHeight - bottomBarHeight;
+            } else {
+                scrollDistance += (offset) - screenHeight - topBarHeight;
+            }
+            canvas.repaint();
+        }
+        tempCount++;
+        return fits;
     }
 
 
