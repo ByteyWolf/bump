@@ -134,6 +134,7 @@ class BUMPHandler():
 
             try:
                 packetlen = self._recv_length()
+                print("length received")
                 data = self._recv_data(packetlen)
                 self.total_incoming_traffic_bytes += packetlen + 4
                 self._check_ratelimit()
@@ -214,11 +215,16 @@ class BUMPHandler():
     
     def send(self, blocktype:int, flags:int, data:bytes):
         """Send a BUMP block without waiting for a response."""
-        if self.closed:
-            raise ConnectionError("Connection is closed")
         
         blockid = self.outgoing_counter
         self.outgoing_counter = (self.outgoing_counter + 1)
+        self.sendResponse(blockid, blocktype, flags, data)
+
+    def sendResponse(self, blockid:int, blocktype:int, flags:int, data:bytes):
+        """Send a BUMP block in response to a received block with the given ID."""
+        if self.closed:
+            raise ConnectionError("Connection is closed")
+        
         block = BUMPBlock(blockid, flags, blocktype, data, encrypted=self.encryption_key is not None)
         self.outgoing_queue.put(block)
     

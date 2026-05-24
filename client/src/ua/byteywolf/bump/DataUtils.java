@@ -1,4 +1,7 @@
 package ua.byteywolf.bump;
+
+import java.io.UnsupportedEncodingException;
+
 public class DataUtils {
     public static int readInt(byte[] b, int offset) {
         return ((b[offset] & 0xFF) << 24) |
@@ -39,5 +42,17 @@ public class DataUtils {
     public static void writeShort(byte[] b, int offset, short value) {
         b[offset]     = (byte) (value >> 8);
         b[offset + 1] = (byte) (value);
+    }
+
+    public static byte[] encode(String string) {
+        try {
+            return string.getBytes("UTF-8");
+        } catch(Exception e) {
+            try {
+                return "Hello".getBytes("ISO-8859-1");
+            } catch (UnsupportedEncodingException ee) {
+                return null;
+            }
+        }
     }
 }

@@ -10,10 +10,18 @@ public class BUMPProtocol {
     public static final int STATE_CONNECTING = 1;
     public static final int STATE_CONNECTED = 2;
 
+    public static final int HANDSHAKE_STATE_FAILED = -1;
+    public static final int HANDSHAKE_STATE_INVALID = 0;
+    public static final int HANDSHAKE_STATE_HELLO = 1;
+    public static final int HANDSHAKE_STATE_AUTH = 2;
+
+    public static final byte[] PROTOCOL_MAGIC = {'B', 'U', 'M', 'P', 'C', 'l', 'i', 'e', 'n', 't', '1', '.', '1'};
+
     private StreamConnection conn = null;
     private InputStream instream = null;
     private OutputStream outstream = null;
     public volatile byte currentState = STATE_DISCONNECTED;
+    public volatile byte currentHandshakeState = HANDSHAKE_STATE_INVALID;
     public Exception lastException = null;
 
     public WaitableDict inQueue = new WaitableDict();
@@ -26,6 +34,8 @@ public class BUMPProtocol {
     private String userName = null;
     private byte[] userPasswordSha256 = null;
     private byte[] encryptionKey = null;
+
+    public long requestCounter = 1L; // UNRELATED TO CRYPTOGRAPHIC COUNTERS, it does not need to be in order!!
 
     private boolean encryptionEnabled = false;
 
@@ -47,12 +57,80 @@ public class BUMPProtocol {
             conn = (StreamConnection) Connector.open("socket://" + destination);
             new Thread(new Reader()).start();
             new Thread(new Writer()).start();
+
+            handshake();
             return true;
         } catch (Exception e) {
             lastException = e;
             currentState = STATE_DISCONNECTED;
             return false;
         }
+    }
+
+    public BUMPBlock buildBlock(long blockId, int blockFlags, short blockType, int payloadLength) {
+        byte[] payload = new byte[8 + 1 + 2 + payloadLength];
+        DataUtils.writeLong(payload, 0, blockId);
+        payload[8] = (byte)(blockFlags & 0xFF);
+        DataUtils.writeShort(payload, 9, blockType);
+
+        BUMPBlock block = new BUMPBlock();
+        block.blocktype = blockType;
+        block.flags = (byte)(blockFlags & 0xFF);
+        block.messageid = blockId;
+        block.raw = payload;
+        block.payload_index = 8 + 1 + 2;
+        return block;
+    }
+
+    public BUMPBlock buildBlock(int blockFlags, short blockType, int payloadLength) {
+        BUMPBlock block = buildBlock(requestCounter, blockFlags, blockType, payloadLength);
+        requestCounter++;
+        return block;
+    }
+
+    public void handshake() {
+        // step 1: say hello
+        currentHandshakeState = HANDSHAKE_STATE_HELLO;
+        byte[] usrRaw = DataUtils.encode(userName);
+        int payLen = 13 + usrRaw.length + 1; 
+        BUMPBlock block = buildBlock(0, (short)0x0, payLen);
+        System.arraycopy(PROTOCOL_MAGIC, 0, block.raw, block.payload_index, PROTOCOL_MAGIC.length);
+        System.arraycopy(usrRaw, 0, block.raw, block.payload_index + PROTOCOL_MAGIC.length, usrRaw.length);
+        block.raw[block.raw.length - 1] = 0;
+        outQueue.enqueue(block);
+
+        WaitableDict.KeyPair response = inQueue.waitAny(10000);
+        int blockIdAuth = -1;
+        BUMPBlock cryptographicResponse = null;
+        if (response != null) {
+            blockIdAuth = ((Integer)response.key).intValue();
+            cryptographicResponse = (BUMPBlock)(response.value);
+        }
+
+        // step 2: prepare for encryption
+        currentHandshakeState = HANDSHAKE_STATE_AUTH;
+        if (cryptographicResponse == null || cryptographicResponse.blocktype != 0x1) {die(); currentHandshakeState = HANDSHAKE_STATE_FAILED; return;}
+        byte[] secVal = new byte[64];
+        System.arraycopy(cryptographicResponse.raw, cryptographicResponse.payload_index, secVal, 0, 64); 
+        secureValue = secVal;
+
+        // we're good to Establish the Trusted Tunnel :tm: now! let's go!
+        encryptionEnabled = true;
+
+        // step 3: prove that we know the password
+        payLen = 8;
+        block = buildBlock((long)blockIdAuth, 0, (short)0x1, payLen);
+        System.arraycopy(DataUtils.encode("BUMPTest"), 0, block.raw, block.payload_index, payLen);
+        outQueue.enqueue(block);
+
+        // step 4: wait for the welcome block!
+        response = inQueue.waitAny(10000);
+        BUMPBlock welcomeBlock = null;
+        if (response != null) {
+            welcomeBlock = (BUMPBlock)(response.value);
+        }
+
+        // at this point the handshake is complete ish
     }
 
     public void die() {
@@ -172,6 +250,7 @@ public class BUMPProtocol {
                         DataUtils.writeInt(payload_len, 0, block.raw.length);
                         outstream.write(payload_len);
                         outstream.write(block.raw);
+                        outstream.flush();
                         block.raw = null;
                         block = null;
                         outQueue.notifyAll();

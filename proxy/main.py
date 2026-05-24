@@ -31,8 +31,10 @@ class ClientHandler():
         self.authenticated:dict[str, str] = {} # username -> service name
         self.available_services:dict[str, BUMPService] = {}
 
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.socket.bind(LOCALDIR)
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind((HOST, PORT))
+        print(f"Binding to {HOST}:{PORT}")
         self.socket.listen()
         while True:
             conn, addr = self.socket.accept()
@@ -40,6 +42,7 @@ class ClientHandler():
 
     def _handle_client(self, conn, addr):
         try:
+            print(f"Incoming connection: {addr[0]}:{addr[1]}")
             handler = bump.BUMPHandler(conn, is_proxy=True, conn_type=bump.CONNECTION_WITHCLIENT)
             _, block = handler.receive(timeout=10)
             if not block or block.type != 0x0000:
@@ -51,7 +54,7 @@ class ClientHandler():
                 raise AuthError(f"Client {addr} sent authentication block with invalid username")
 
             with handler.encryption_lock:
-                handler.send(0x0001, 0, handler.secure_value)
+                handler.sendResponse(block.id, 0x0001, 0, handler.secure_value)
                 password = users[username]["password"]
                 if password.startswith("sha256:"):
                     password = bytes.fromhex(password.removeprefix("sha256:"))
@@ -75,3 +78,6 @@ class ClientHandler():
             print(f"Authentication error: {e}")
             conn.close()
             return
+        
+if __name__ == "__main__":
+    ClientHandler()

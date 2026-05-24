@@ -52,9 +52,14 @@ public class ConnectingPage implements AppPage {
 
                 if (connectMode == MODE_WAIT_FOR_HANDSHAKE) {
                     Exception e = AppUI.messagingApi.lastException;
-                    if (AppUI.messagingApi.currentState == BUMPProtocol.STATE_DISCONNECTED && e != null) {
-                        BUMPMessenger.showErrorAndExit(e.getClass().getName() + ": " + e.getMessage());
+                    if (AppUI.messagingApi.currentState == BUMPProtocol.STATE_DISCONNECTED) {
+                        if (AppUI.messagingApi.currentHandshakeState == BUMPProtocol.HANDSHAKE_STATE_FAILED) {
+                            BUMPMessenger.showErrorAndExit("Failed to handshake! Please try again.");
+                        } else if (e != null) {
+                            BUMPMessenger.showErrorAndExit(e.getClass().getName() + ": " + e.getMessage());
+                        }
                     }
+                    
                 }
             }
         }, 0, 100);
@@ -70,7 +75,8 @@ public class ConnectingPage implements AppPage {
             globeSprite.paint(g);
 
             g.setColor(255, 255, 255);
-            g.drawString("Connecting...", UIToolkit.screenWidth / 2, UIToolkit.screenHeight / 2 + 10, Graphics.HCENTER | Graphics.TOP);
+            int state = AppUI.messagingApi.currentHandshakeState;
+            g.drawString(state == BUMPProtocol.HANDSHAKE_STATE_HELLO ? "Negotiating..." : (state == BUMPProtocol.HANDSHAKE_STATE_AUTH ? "Authenticating..." : "Connecting..."), UIToolkit.screenWidth / 2, UIToolkit.screenHeight / 2 + 10, Graphics.HCENTER | Graphics.TOP);
         }
     }
 
