@@ -2,5 +2,5 @@
 # Note that you can specify both plaintext and SHA256 passwords.
 # It is however suggested to use SHA256 hashes for security
 
-[TestUser]
+[user]
 password = "sha256:f76b61b962db075bb76ad6f3fab10f7bd546f92f1b89f18c513d4122575c18ac"

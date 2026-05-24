@@ -52,9 +52,11 @@ class ClientHandler():
             username = block.read_string()
             if len(username) == 0 or len(username) > 255 or not username in users or username in self.authenticated:
                 raise AuthError(f"Client {addr} sent authentication block with invalid username")
+            
+            print("Username validated, starting encryption.")
 
             with handler.encryption_lock:
-                handler.sendResponse(block.id, 0x0001, 0, handler.secure_value)
+                handler.send(0x0001, 0, handler.secure_value)
                 password = users[username]["password"]
                 if password.startswith("sha256:"):
                     password = bytes.fromhex(password.removeprefix("sha256:"))

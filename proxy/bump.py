@@ -93,7 +93,11 @@ class BUMPHandler():
         else:
             self.outgoing_counter = 0xFFFFFFFF
 
+        threading.Thread(target=self._handle_incoming_forever).start()
+        threading.Thread(target=self._handle_outgoing_forever).start()
+
     def _recv_length(self):
+        # i hate this stupid function its AWFUL AND UGLY
         packetlenlen = 0
         packetlen = b''
         while packetlenlen < 4:
@@ -102,13 +106,15 @@ class BUMPHandler():
                 raise ConnectionError("Connection closed by peer")
             packetlen += chunk
             packetlenlen += len(chunk)
-
-            # goddamn nested if
-            if self.state == STATE_HANDSHAKE or self.state == STATE_AUTHORIZING:
-                if time.time() - self.timer > self.settings.handshake_timeout:
-                    raise TimeoutError("Handshake timed out")
-                if struct.unpack('>I', packetlen)[0] > self.settings.max_packet_size_handshake:
-                    raise ValueError(f"Packet length {packetlen} exceeds maximum allowed {self.settings.max_packet_size_handshake}")
+            if time.time() - self.timer > self.settings.handshake_timeout:
+                raise TimeoutError("Handshake timed out")
+            
+        # goddamn nested if
+        if self.state == STATE_HANDSHAKE or self.state == STATE_AUTHORIZING:
+            if struct.unpack('>I', packetlen)[0] > self.settings.max_packet_size_handshake:
+                raise ValueError(f"Packet length {packetlen} exceeds maximum allowed {self.settings.max_packet_size_handshake}")
+        if struct.unpack('>I', packetlen)[0] > self.settings.max_packet_size:
+            raise ValueError(f"Packet length {packetlen} exceeds maximum allowed {self.settings.max_packet_size}")
                     
         return struct.unpack('>I', packetlen)[0]
     
@@ -134,7 +140,6 @@ class BUMPHandler():
 
             try:
                 packetlen = self._recv_length()
-                print("length received")
                 data = self._recv_data(packetlen)
                 self.total_incoming_traffic_bytes += packetlen + 4
                 self._check_ratelimit()
